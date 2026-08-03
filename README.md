@@ -1,10 +1,29 @@
-# Screenshot API
+# Self-Hosted Website Screenshot API
 
-A small HTTP API that turns a URL into a clean PNG screenshot.
+A self-hosted website screenshot API that turns any public URL into a clean PNG
+image. This open-source URL-to-PNG API is built with TypeScript,
+Playwright, Hono, and headless Chromium.
 
-It uses Playwright to load the page, remove common cookie banners and popups,
-prepare lazy-loaded media, stop animations, and return the screenshot as
-base64 JSON. Desktop capture is always included; mobile capture is optional.
+The API removes common cookie banners and popups, prepares lazy-loaded media,
+stops animations, and returns the screenshot as base64 JSON. Every request
+includes a desktop capture and can optionally include a responsive mobile
+capture.
+
+Source: [GitHub repository](https://github.com/epicx-labs/screenshot-api)
+
+## Features
+
+- Self-hosted Playwright screenshot API with a small HTTP interface.
+- Clean webpage screenshots without common consent banners, popups, or
+  animations.
+- Independent desktop and mobile browser contexts for responsive screenshots.
+- Base64-encoded PNG responses for easy storage or embedding.
+- Docker image with headless Chromium included.
+- Bounded capture queue with HTTP `429` backpressure.
+
+Use it as a Docker screenshot API for automated website previews, visual QA,
+content snapshots, link previews, or other server-side webpage capture
+workflows.
 
 ## Quick start with Docker
 
@@ -181,6 +200,11 @@ src/modules/screenshots/         Playwright capture and page cleanup
 tests/                           Unit tests
 tests/e2e/                       Docker-backed contract tests
 ```
+
+## Related project
+
+This project is open-sourced by [Keytomic](https://keytomic.com), an AI SEO
+automation platform for Google and LLM visibility.
 
 ## Security
 
