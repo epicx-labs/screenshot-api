@@ -1,0 +1,27 @@
+{
+    "kind": "object",
+    "properties": {
+        "desktop": {
+            "kind": "object",
+            "properties": {
+                "base64": {
+                    "kind": "string"
+                }
+            }
+        },
+        "mobile": {
+            "kind": "object",
+            "properties": {
+                "base64": {
+                    "kind": "string"
+                }
+            }
+        },
+        "ok": {
+            "kind": "boolean"
+        },
+        "url": {
+            "kind": "string"
+        }
+    }
+}

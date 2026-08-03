@@ -1,0 +1,44 @@
+{
+    "name": "screenshot-api",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "packageManager": "pnpm@11.18.0",
+    "engines": {
+        "node": ">=26.5.1"
+    },
+    "description": "Standalone screenshot API using Crawlee, Playwright, and Hono.",
+    "dependencies": {
+        "@hono/node-server": "^2.0.12",
+        "crawlee": "^3.17.0",
+        "hono": "^4.12.34",
+        "playwright": "^1.62.1",
+        "zod": "^4.4.3"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.5.6",
+        "@playwright/test": "^1.62.1",
+        "@types/node": "^26.1.2",
+        "@vitest/coverage-v8": "^4.1.10",
+        "tsx": "^4.23.5",
+        "typescript": "~7.0.2",
+        "vitest": "^4.1.10"
+    },
+    "scripts": {
+        "start": "node dist/src/api/main.js",
+        "dev": "docker compose up --build",
+        "dev:server": "tsx watch src/api/main.ts",
+        "build": "tsc",
+        "typecheck": "tsc --noEmit --incremental false && pnpm run typecheck:test",
+        "typecheck:test": "tsc -p tsconfig.test.json",
+        "lint": "biome lint .",
+        "format": "biome format --write .",
+        "check": "biome check .",
+        "check:write": "biome check --write .",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "test:watch": "vitest",
+        "test:e2e": "bash tests/e2e/scripts/run-docker-e2e.sh"
+    },
+    "license": "ISC"
+}

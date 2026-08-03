@@ -1,0 +1,74 @@
+info:
+  name: Screenshots
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{baseUrl}}/screenshots"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://keytomic.com"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        var body = typeof res.getBody === "function" ? res.getBody() : res.body;
+        var imageStyle = "display:block;max-width:100%;height:auto;border:1px solid #d0d7de;border-radius:6px";
+        var wrapStyle = "font-family:ui-sans-serif,system-ui,sans-serif;padding:16px;color:#111827";
+        var headingStyle = "font-size:16px;font-weight:700;margin:0 0 12px 0";
+        var figureStyle = "margin:0 0 20px 0";
+        var captionStyle = "font-weight:600;margin:0 0 8px 0";
+        var html = '<main style="' + wrapStyle + '"><h1 style="' + headingStyle + '">Screenshot preview</h1>';
+
+        if (body && body.ok && body.desktop && body.desktop.base64) {
+          html += '<figure style="' + figureStyle + '">';
+          html += '<figcaption style="' + captionStyle + '">Desktop</figcaption>';
+          html += '<img alt="Desktop" src="data:image/png;base64,' + body.desktop.base64 + '" style="' + imageStyle + '" />';
+          html += "</figure>";
+
+          if (body.mobile && body.mobile.base64) {
+            html += '<figure style="' + figureStyle + '">';
+            html += '<figcaption style="' + captionStyle + '">Mobile</figcaption>';
+            html += '<img alt="Mobile" src="data:image/png;base64,' + body.mobile.base64 + '" style="' + imageStyle + '" />';
+            html += "</figure>";
+          }
+        } else {
+          html += "No screenshot returned.";
+        }
+
+        html += "</main>";
+        bru.visualize(html);
+    - type: tests
+      code: |-
+        test("returns a desktop screenshot as base64", function () {
+          expect(res.status).to.equal(200);
+          expect(res.body.ok).to.equal(true);
+          expect(res.body.desktop.base64).to.be.a("string").and.not.be.empty;
+        });
+
+        test("returns mobile screenshot as base64 when present", function () {
+          if (res.body.mobile) {
+            expect(res.body.mobile.base64).to.be.a("string").and.not.be.empty;
+          }
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Capture a desktop screenshot for one URL.
+
+  Optional fields: `waitForMs`, `resizeWaitMs`, `includeMobile`.
+
+  The post-response script renders returned base64 screenshots in Bruno's Visualize panel.

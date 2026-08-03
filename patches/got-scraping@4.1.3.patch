@@ -1,0 +1,36 @@
+diff --git a/dist/index.js b/dist/index.js
+index 338027237c90ce88143d8dacd4bbcde9185ed2c4..8649f06bc8b880487e26ca3662df9ae0457576b7 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -198,6 +198,7 @@ var TransformHeadersAgent = _TransformHeadersAgent;
+ // src/hooks/browser-headers.ts
+ import "got";
+ import http22 from "http2-wrapper";
++const { auto: auto2 } = http22;
+ import "node:url";
+ 
+ // src/resolve-protocol.ts
+@@ -205,12 +206,12 @@ import { isIPv6 as isIPv62 } from "node:net";
+ import tls2 from "node:tls";
+ import { URL as URL3 } from "node:url";
+ import "got";
+-import { auto as auto2 } from "http2-wrapper";
+ import QuickLRU from "quick-lru";
+ 
+ // src/hooks/proxy.ts
+ import "got";
+-import http2, { auto } from "http2-wrapper";
++import http2 from "http2-wrapper";
++const { auto } = http2;
+ import { URL as URL2 } from "node:url";
+ 
+ // src/agent/h1-proxy-agent.ts
+@@ -699,7 +700,7 @@ var fixDecompress = /* @__PURE__ */ __name((options, next) => {
+ // src/hooks/http2.ts
+ import "node:url";
+ import "got";
+-import { auto as auto3 } from "http2-wrapper";
++const { auto: auto3 } = http22;
+ function http2Hook(options) {
+   const { proxyUrl, sessionData } = options.context;
+   if (options.http2 && options.url.protocol !== "http:") {

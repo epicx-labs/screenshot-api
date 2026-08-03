@@ -1,0 +1,24 @@
+services:
+  app:
+    platform: "${DOCKER_PLATFORM:-linux/amd64}"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    build:
+      context: .
+      target: builder
+    command: bash -lc "CI=true pnpm install --frozen-lockfile && pnpm run dev:server"
+    ports:
+      - "${HOST_PORT:-4000}:${PORT:-3000}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "${PORT:-3000}"
+      CRAWLEE_DEFAULT_BROWSER_PATH: "/usr/bin/google-chrome"
+    volumes:
+      - .:/home/screenshot
+      - screenshot_api_node_modules:/home/screenshot/node_modules
+
+volumes:
+  screenshot_api_node_modules:

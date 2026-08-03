@@ -1,0 +1,17 @@
+services:
+  app:
+    image: screenshot-api-e2e:local
+    environment:
+      PORT: '3000'
+      HOST: '0.0.0.0'
+      CRAWLEE_DEFAULT_BROWSER_PATH: '/usr/bin/google-chrome'
+    ports:
+      - '127.0.0.1:4010:3000'
+    depends_on:
+      - fixture
+
+  fixture:
+    image: nginx:alpine
+    volumes:
+      - ${PWD}/tests/e2e/fixture-site:/usr/share/nginx/html:ro
+      - ${PWD}/tests/e2e/fixture-site/nginx.conf:/etc/nginx/conf.d/default.conf:ro

@@ -1,0 +1,27 @@
+{
+    "kind": "object",
+    "properties": {
+        "details": {
+            "kind": "array",
+            "items": [
+                {
+                    "kind": "object",
+                    "properties": {
+                        "message": {
+                            "kind": "string"
+                        },
+                        "path": {
+                            "kind": "string"
+                        }
+                    }
+                }
+            ]
+        },
+        "error": {
+            "kind": "string"
+        },
+        "ok": {
+            "kind": "boolean"
+        }
+    }
+}
