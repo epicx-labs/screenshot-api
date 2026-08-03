@@ -38,4 +38,4 @@ fi
 
 echo "Running screenshot API contract tests..."
 export E2E_API_BASE_URL
-pnpm exec playwright test --config=playwright.e2e.config.ts
+pnpm exec tsx tests/e2e/run-contract-tests.ts

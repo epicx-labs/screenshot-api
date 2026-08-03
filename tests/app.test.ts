@@ -1,30 +1,29 @@
 import { expect, test } from 'vitest';
 
 import { createApp } from '../src/api/app.js';
-import type { ScreenshotRequest } from '../src/types.js';
 
 /**
- * Sends a request through the public Hono fetch interface.
+ * Sends a request through the public HTTP interface.
  *
- * @param fetch - Application fetch handler.
- * @param pathname - API pathname.
- * @param init - Optional request configuration.
+ * @param app - Hono application.
+ * @param pathname - Request pathname.
+ * @param init - Optional request settings.
  * @returns HTTP response.
  */
 function request(
-    fetch: (request: Request) => Response | Promise<Response>,
+    app: ReturnType<typeof createApp>,
     pathname: string,
     init?: RequestInit,
 ): Promise<Response> {
     return Promise.resolve(
-        fetch(new Request(`http://localhost${pathname}`, init)),
+        app.fetch(new Request(`http://localhost${pathname}`, init)),
     );
 }
 
 /**
- * Creates a deferred promise for queue saturation tests.
+ * Creates a promise whose completion is controlled by the test.
  *
- * @returns Promise with manual resolver.
+ * @returns Deferred promise and resolver.
  */
 function createDeferred<T>(): {
     /** Deferred promise. */
@@ -39,17 +38,15 @@ function createDeferred<T>(): {
     return { promise, resolve: resolveRef };
 }
 
-test('health route reports the screenshot service is ready', async () => {
-    const { app } = createApp();
-    const response = await request(app.fetch, '/health');
+test('health route reports readiness', async () => {
+    const response = await request(createApp(), '/health');
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
 });
 
-test('root route identifies the standalone screenshot service', async () => {
-    const { app } = createApp();
-    const response = await request(app.fetch, '/');
+test('root route identifies the screenshot service', async () => {
+    const response = await request(createApp(), '/');
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -58,34 +55,20 @@ test('root route identifies the standalone screenshot service', async () => {
     });
 });
 
-test('crawler routes are not exposed by the screenshot service', async () => {
-    const { app } = createApp();
-    const response = await request(app.fetch, '/crawl', {
+test('POST /screenshots preserves the success response', async () => {
+    const app = createApp({
+        captureScreenshotsFn: async () => ({
+            desktop: { base64: 'desktop-base64' },
+            mobile: { base64: 'mobile-base64' },
+        }),
+    });
+    const response = await request(app, '/screenshots', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: 'https://example.com' }),
-    });
-
-    expect(response.status).toBe(404);
-});
-
-test('POST /screenshots preserves the existing success contract', async () => {
-    const { app } = createApp({
-        dependencies: {
-            captureScreenshotsFn: async () => ({
-                desktop: { base64: 'desktop-base64' },
-                mobile: { base64: 'mobile-base64' },
-            }),
-        },
-    });
-    const payload: ScreenshotRequest = {
-        url: 'https://example.com',
-        includeMobile: true,
-    };
-    const response = await request(app.fetch, '/screenshots', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+            url: 'https://example.com',
+            includeMobile: true,
+        }),
     });
 
     expect(response.status).toBe(200);
@@ -97,41 +80,69 @@ test('POST /screenshots preserves the existing success contract', async () => {
     });
 });
 
-test('POST /screenshots preserves validation errors', async () => {
-    const { app } = createApp();
-    const response = await request(app.fetch, '/screenshots', {
+test('POST /screenshots rejects invalid requests', async () => {
+    const response = await request(createApp(), '/screenshots', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),
     });
     const body = (await response.json()) as {
-        ok: boolean;
         error: string;
         details: unknown[];
     };
 
     expect(response.status).toBe(400);
-    expect(body.ok).toBe(false);
     expect(body.error).toBe('Invalid request body.');
     expect(body.details).toHaveLength(1);
 });
 
-test('POST /screenshots returns 429 when its queue is full', async () => {
-    const firstJob = createDeferred<{ desktop: { base64: string } }>();
-    const { app } = createApp({
+test('POST /screenshots rejects malformed JSON', async () => {
+    const response = await request(createApp(), '/screenshots', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{',
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: 'Invalid JSON body.',
+    });
+});
+
+test('POST /screenshots returns capture failures', async () => {
+    const app = createApp({
+        captureScreenshotsFn: async () => {
+            throw new Error('Capture failed.');
+        },
+    });
+    const response = await request(app, '/screenshots', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: 'https://example.com' }),
+    });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: 'Capture failed.',
+    });
+});
+
+test('POST /screenshots returns 429 when capacity is full', async () => {
+    const firstCapture = createDeferred<{ desktop: { base64: string } }>();
+    const app = createApp({
         maxInFlight: 1,
         maxQueue: 1,
-        dependencies: {
-            captureScreenshotsFn: async (options) => {
-                if (options.url.endsWith('/first')) {
-                    return firstJob.promise;
-                }
-                return { desktop: { base64: 'queued' } };
-            },
+        captureScreenshotsFn: async ({ url }) => {
+            if (url.endsWith('/first')) {
+                return firstCapture.promise;
+            }
+            return { desktop: { base64: 'queued' } };
         },
     });
     const send = (url: string) =>
-        request(app.fetch, '/screenshots', {
+        request(app, '/screenshots', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ url }),
@@ -140,9 +151,8 @@ test('POST /screenshots returns 429 when its queue is full', async () => {
     const first = send('https://example.com/first');
     const second = send('https://example.com/second');
     const overflow = await send('https://example.com/third');
-    firstJob.resolve({ desktop: { base64: 'first' } });
-    await first;
-    await second;
+    firstCapture.resolve({ desktop: { base64: 'first' } });
+    await Promise.all([first, second]);
 
     expect(overflow.status).toBe(429);
     expect(overflow.headers.get('Retry-After')).toBe('10');

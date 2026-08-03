@@ -642,7 +642,9 @@ describe('dismissScreenshotBlockers', () => {
             restoreDom();
         }
 
-        expect(widget.attributes.get('data-crawler-clean-hidden')).toBe('true');
+        expect(widget.attributes.get('data-clean-screenshot-hidden')).toBe(
+            'true',
+        );
         expect(widget.style.values.get('display')).toBe('none');
     });
 
@@ -694,7 +696,9 @@ describe('dismissScreenshotBlockers', () => {
             restoreDom();
         }
 
-        expect(gate.attributes.get('data-crawler-clean-hidden')).toBe('true');
+        expect(gate.attributes.get('data-clean-screenshot-hidden')).toBe(
+            'true',
+        );
         expect(gate.style.values.get('display')).toBe('none');
     });
 
@@ -722,7 +726,7 @@ describe('dismissScreenshotBlockers', () => {
         }
 
         expect(
-            wrapper.attributes.get('data-crawler-clean-hidden'),
+            wrapper.attributes.get('data-clean-screenshot-hidden'),
         ).toBeUndefined();
         expect(wrapper.style.values.get('display')).toBeUndefined();
     });
@@ -751,7 +755,7 @@ describe('dismissScreenshotBlockers', () => {
         }
 
         expect(
-            header.attributes.get('data-crawler-clean-hidden'),
+            header.attributes.get('data-clean-screenshot-hidden'),
         ).toBeUndefined();
         expect(header.style.values.get('display')).toBeUndefined();
     });
@@ -793,9 +797,11 @@ describe('dismissScreenshotBlockers', () => {
             restoreDom();
         }
 
-        expect(modal.attributes.get('data-crawler-clean-hidden')).toBe('true');
+        expect(modal.attributes.get('data-clean-screenshot-hidden')).toBe(
+            'true',
+        );
         expect(modal.style.values.get('display')).toBe('none');
-        expect(backdrop.attributes.get('data-crawler-clean-hidden')).toBe(
+        expect(backdrop.attributes.get('data-clean-screenshot-hidden')).toBe(
             'true',
         );
         expect(backdrop.style.values.get('display')).toBe('none');
@@ -830,7 +836,9 @@ describe('dismissScreenshotBlockers', () => {
             restoreDom();
         }
 
-        expect(modal.attributes.get('data-crawler-clean-hidden')).toBe('true');
+        expect(modal.attributes.get('data-clean-screenshot-hidden')).toBe(
+            'true',
+        );
         expect(modal.style.values.get('display')).toBe('none');
     });
 
@@ -866,7 +874,7 @@ describe('dismissScreenshotBlockers', () => {
             restoreDom();
         }
 
-        expect(overlay.attributes.get('data-crawler-clean-hidden')).toBe(
+        expect(overlay.attributes.get('data-clean-screenshot-hidden')).toBe(
             'true',
         );
         expect(overlay.style.values.get('display')).toBe('none');
@@ -903,11 +911,11 @@ describe('dismissScreenshotBlockers', () => {
         }
 
         expect(
-            heroWrapper.attributes.get('data-crawler-clean-hidden'),
+            heroWrapper.attributes.get('data-clean-screenshot-hidden'),
         ).toBeUndefined();
         expect(heroWrapper.style.values.get('display')).toBeUndefined();
         expect(
-            placeholderText.attributes.get('data-crawler-clean-hidden'),
+            placeholderText.attributes.get('data-clean-screenshot-hidden'),
         ).toBe('true');
         expect(placeholderText.style.values.get('display')).toBe('none');
     });
@@ -1034,7 +1042,9 @@ describe('prepareCleanScreenshot', () => {
             restoreDom();
         }
 
-        expect(banner.attributes.get('data-crawler-clean-hidden')).toBe('true');
+        expect(banner.attributes.get('data-clean-screenshot-hidden')).toBe(
+            'true',
+        );
         expect(banner.style.values.get('display')).toBe('none');
     });
 });

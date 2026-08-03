@@ -1,56 +1,39 @@
 # Screenshot API
 
-Standalone TypeScript API for clean desktop and optional mobile screenshots.
-It runs Playwright through Crawlee and deploys as a Docker service on Dokploy.
+A small HTTP API that turns a URL into a clean PNG screenshot.
 
-## Requirements
+It uses Playwright to load the page, remove common cookie banners and popups,
+prepare lazy-loaded media, stop animations, and return the screenshot as
+base64 JSON. Desktop capture is always included; mobile capture is optional.
 
-- Node.js 26.5.1+
-- pnpm 11.18.0
-- Docker
+## Quick start with Docker
 
-## Install and verify
-
-```bash
-pnpm install
-pnpm run check
-pnpm run typecheck
-pnpm test
-pnpm run build
-```
-
-## Run
-
-Docker development with hot reload:
+Docker is the easiest way to run the API because Chrome is already included.
 
 ```bash
-cp .env.example .env
-pnpm dev
+docker build -t screenshot-api .
+docker run --rm -p 3000:3000 screenshot-api
 ```
 
-Direct source watcher:
+Check that it is ready:
 
 ```bash
-pnpm run dev:server
+curl http://localhost:3000/health
 ```
 
-Compiled production server:
+Capture a screenshot:
 
 ```bash
-pnpm run build
-pnpm start
+curl -X POST http://localhost:3000/screenshots \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com"}'
 ```
-
-Docker Compose exposes the API at `http://localhost:4000`. The direct server
-uses `http://localhost:3000` by default.
 
 ## API
 
-- `GET /` — readiness.
-- `GET /health` — health check.
-- `POST /screenshots` — captures desktop and optionally mobile screenshots.
+### `POST /screenshots`
 
-Request:
+Request body:
 
 ```json
 {
@@ -61,23 +44,158 @@ Request:
 }
 ```
 
-`waitForMs`, `resizeWaitMs`, and `includeMobile` are optional. The existing
-`/screenshots` request and response contract is unchanged.
+| Field | Required | Default | Description |
+| --- | --- | --- | --- |
+| `url` | Yes | — | HTTP or HTTPS page to capture |
+| `waitForMs` | No | `1000` | Extra wait after the page loads |
+| `resizeWaitMs` | No | `500` | Wait while lazy media loads |
+| `includeMobile` | No | `false` | Include a `390 × 844` mobile capture |
 
-## Capacity
+Successful response:
 
-| Variable | Default | Purpose |
+```json
+{
+    "ok": true,
+    "url": "https://example.com/",
+    "desktop": {
+        "base64": "iVBORw0KGgo..."
+    },
+    "mobile": {
+        "base64": "iVBORw0KGgo..."
+    }
+}
+```
+
+`mobile` is omitted unless `includeMobile` is `true`.
+
+Validation failure:
+
+```json
+{
+    "ok": false,
+    "error": "Invalid request body.",
+    "details": [
+        {
+            "path": "url",
+            "message": "Invalid input: expected string, received undefined"
+        }
+    ]
+}
+```
+
+Capture failures return HTTP `500`. When the configured capture queue is full,
+the API returns HTTP `429` with a `Retry-After` header.
+
+### Health routes
+
+- `GET /health` returns `{ "ok": true }`.
+- `GET /` returns a short readiness message.
+
+## What “clean” means
+
+Before each viewport is captured, the API:
+
+1. Dismisses or hides common consent banners, modals, popups, and floating
+   widgets.
+2. Scrolls near the fold to trigger lazy images, videos, and embeds.
+3. Returns to the top of the page.
+4. Disables animations, transitions, smooth scrolling, and text carets.
+5. Pauses videos.
+6. Runs blocker cleanup once more for late popups.
+
+Cleanup is best-effort. A site-specific cleanup failure does not discard an
+otherwise valid screenshot.
+
+Desktop and mobile screenshots load in separate browser contexts so responsive
+layouts are captured independently.
+
+## Local development
+
+Requirements:
+
+- Node.js 26.5.1 or newer
+- pnpm 11.18.0
+
+Install the project and Playwright browser:
+
+```bash
+nvm install
+nvm use
+npm install --global pnpm@11.18.0
+pnpm install
+pnpm exec playwright install chromium
+```
+
+Start the TypeScript development server:
+
+```bash
+cp .env.example .env
+pnpm run dev:server
+```
+
+The server listens on `http://localhost:3000` by default.
+
+For Docker development with source mounting and hot reload:
+
+```bash
+cp .env.example .env
+pnpm dev
+```
+
+Docker Compose exposes the API at `http://localhost:4000`.
+
+## Configuration
+
+| Variable | Default | Description |
 | --- | ---: | --- |
-| `MAX_INFLIGHT` | 1 | Concurrent screenshot requests |
-| `MAX_QUEUE` | 50 | Queued screenshot requests |
-| `RATE_LIMIT_RETRY_AFTER_SECS` | 10 | `Retry-After` value for `429` responses |
-| `LOG_LEVEL` | `info` | Minimum structured log level |
+| `HOST` | `0.0.0.0` | Server bind address |
+| `PORT` | `3000` | Server port |
+| `MAX_INFLIGHT` | `1` | Captures allowed to run simultaneously |
+| `MAX_QUEUE` | `50` | Captures allowed to wait |
+| `RATE_LIMIT_RETRY_AFTER_SECS` | `10` | `Retry-After` value for HTTP `429` |
+| `PLAYWRIGHT_EXECUTABLE_PATH` | Playwright default | Optional Chrome executable path |
 
-## E2E contract test
+## Build and test
+
+```bash
+pnpm run check
+pnpm run typecheck
+pnpm test
+pnpm run build
+```
+
+Run the Docker-backed contract tests:
 
 ```bash
 pnpm run test:e2e
 ```
 
-The test builds the production image, starts a local fixture site, verifies the
-frozen `/screenshots` response shapes, and removes the temporary stack.
+The E2E suite builds the production image, starts a fixture website, verifies
+the public response shapes, and removes its temporary containers.
+
+## Project structure
+
+```text
+src/api/                         HTTP routes and server entry point
+src/modules/screenshots/         Playwright capture and page cleanup
+tests/                           Unit tests
+tests/e2e/                       Docker-backed contract tests
+```
+
+## Security
+
+The API can visit arbitrary URLs. Do not expose it publicly without
+authentication, request limits, and outbound network restrictions. Otherwise,
+users may be able to reach private or local network addresses from the server.
+
+## Contributing
+
+1. Create a focused branch.
+2. Add or update tests for behavior changes.
+3. Run `pnpm run check`, `pnpm run typecheck`, `pnpm test`, and
+   `pnpm run build`.
+4. Open a pull request explaining the user-visible change.
+
+## License
+
+ISC

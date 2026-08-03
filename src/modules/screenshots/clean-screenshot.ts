@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 
-const CLEAN_SCREENSHOT_STYLE_ID = 'crawler-clean-screenshot-style';
+const CLEAN_SCREENSHOT_STYLE_ID = 'clean-screenshot-style';
 
 /**
  * Minimal Playwright page methods needed to prepare a clean screenshot.
@@ -733,7 +733,7 @@ export async function dismissScreenshotBlockers(
                 continue;
             }
 
-            candidate.setAttribute('data-crawler-clean-hidden', 'true');
+            candidate.setAttribute('data-clean-screenshot-hidden', 'true');
             candidate.style.setProperty('display', 'none', 'important');
             candidate.style.setProperty('visibility', 'hidden', 'important');
         }

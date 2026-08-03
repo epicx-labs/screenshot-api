@@ -26,12 +26,7 @@ function resolveHost(): string {
 
 const port = resolvePort();
 const host = resolveHost();
-const { app, logger, rateLimit } = createApp();
+const app = createApp();
 
 serve({ fetch: app.fetch, port, hostname: host });
 console.log(`Screenshot API listening on http://${host}:${port}`);
-logger.info('rate_limit.configured', {
-    maxInFlight: rateLimit.maxInFlight,
-    maxQueue: rateLimit.maxQueue,
-    retryAfterSeconds: rateLimit.retryAfterSeconds,
-});

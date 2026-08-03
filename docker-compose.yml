@@ -15,7 +15,7 @@ services:
         required: false
     environment:
       PORT: "${PORT:-3000}"
-      CRAWLEE_DEFAULT_BROWSER_PATH: "/usr/bin/google-chrome"
+      PLAYWRIGHT_EXECUTABLE_PATH: "/usr/bin/google-chrome"
     volumes:
       - .:/home/screenshot
       - screenshot_api_node_modules:/home/screenshot/node_modules
