@@ -892,7 +892,7 @@ export async function freezeDynamicMedia(
             '}',
         ].join('\\n');
 
-        if (!style.parentElement) {
+        if (!style.parentElement && document.head) {
             document.head.appendChild(style);
         }
 

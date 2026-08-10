@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import {
     dismissScreenshotBlockers,
+    freezeDynamicMedia,
     prepareCleanScreenshot,
     prepareLazyMedia,
 } from '../src/modules/screenshots/clean-screenshot.js';
@@ -1046,5 +1047,44 @@ describe('prepareCleanScreenshot', () => {
             'true',
         );
         expect(banner.style.values.get('display')).toBe('none');
+    });
+});
+
+describe('freezeDynamicMedia', () => {
+    test('continues when the document has no head', async () => {
+        class FakeStyleElement extends FakeElement {}
+
+        const pause = vi.fn();
+        const previous = {
+            document: globalThis.document,
+            HTMLStyleElement: globalThis.HTMLStyleElement,
+        };
+
+        Object.assign(globalThis, {
+            document: {
+                getElementById: () => null,
+                createElement: () => new FakeStyleElement(),
+                head: null,
+                querySelectorAll: () => [{ pause }],
+            },
+            HTMLStyleElement: FakeStyleElement,
+        });
+
+        try {
+            await freezeDynamicMedia({
+                evaluate: async (script: string) => {
+                    if (typeof script !== 'string') {
+                        throw new TypeError('expected browser script string');
+                    }
+
+                    Function(script)();
+                },
+                waitForTimeout: vi.fn(),
+            });
+        } finally {
+            Object.assign(globalThis, previous);
+        }
+
+        expect(pause).toHaveBeenCalledTimes(1);
     });
 });
