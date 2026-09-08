@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import { createApp } from '../src/api/app.js';
 
@@ -156,4 +156,58 @@ test('POST /screenshots returns 429 when capacity is full', async () => {
 
     expect(overflow.status).toBe(429);
     expect(overflow.headers.get('Retry-After')).toBe('10');
+});
+
+test.each(['expiry', 'cancellation'])(
+    'removes waiting work on %s without capturing it',
+    async (reason) => {
+        const active = createDeferred<{ desktop: { base64: string } }>();
+        const capture = vi.fn(async () => active.promise);
+        const app = createApp({
+            maxInFlight: 1,
+            maxQueue: 1,
+            queueTimeoutMs: 30,
+            captureScreenshotsFn: capture,
+        });
+        const controller = new AbortController();
+        const send = (signal?: AbortSignal) =>
+            request(app, '/screenshots', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ url: 'https://example.com' }),
+                ...(signal ? { signal } : {}),
+            });
+        const first = send();
+        const waiting = send(controller.signal);
+        await vi.waitFor(() => expect(capture).toHaveBeenCalledOnce(), {
+            interval: 1,
+        });
+        if (reason === 'cancellation') controller.abort();
+        const response = await waiting;
+        expect(response.status).toBe(500);
+        expect(await response.json()).toMatchObject({
+            error:
+                reason === 'expiry'
+                    ? 'Screenshot queue wait timed out.'
+                    : 'Capture cancelled.',
+        });
+        const replacement = send();
+        active.resolve({ desktop: { base64: 'image' } });
+        expect((await first).status).toBe(200);
+        expect((await replacement).status).toBe(200);
+        expect(capture).toHaveBeenCalledTimes(2);
+    },
+);
+
+test('does not capture an already cancelled request', async () => {
+    const capture = vi.fn();
+    const app = createApp({ captureScreenshotsFn: capture });
+    const response = await request(app, '/screenshots', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: 'https://example.com' }),
+        signal: AbortSignal.abort(),
+    });
+    expect(response.status).toBe(500);
+    expect(capture).not.toHaveBeenCalled();
 });

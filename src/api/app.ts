@@ -34,12 +34,17 @@ export interface CreateAppOptions {
     maxQueue?: number;
     /** Retry delay returned with overload responses. */
     retryAfterSeconds?: number;
+    /** Maximum time a capture may wait for capacity. */
+    queueTimeoutMs?: number;
 }
 
 /** Work queue used to bound browser resource usage. */
 interface ScreenshotQueue {
     /** Schedules work or returns `undefined` when full. */
-    schedule: <T>(task: () => Promise<T>) => Promise<T> | undefined;
+    schedule: <T>(
+        task: () => Promise<T>,
+        signal: AbortSignal,
+    ) => Promise<T> | undefined;
     /** Returns current running and waiting task counts. */
     state: () => { inFlight: number; queueDepth: number };
 }
@@ -52,6 +57,8 @@ interface QueuedTask {
     resolve: (value: unknown) => void;
     /** Rejects the caller's promise. */
     reject: (error: unknown) => void;
+    /** Removes waiting-only timers and cancellation listeners before execution. */
+    cleanup: () => void;
 }
 
 /**
@@ -73,11 +80,13 @@ function positiveInteger(value: number | string | undefined, fallback: number) {
  *
  * @param maxInFlight - Maximum tasks running at once.
  * @param maxQueue - Maximum tasks waiting to run.
+ * @param queueTimeoutMs - Maximum waiting time before removing a task.
  * @returns Bounded screenshot queue.
  */
 function createScreenshotQueue(
     maxInFlight: number,
     maxQueue: number,
+    queueTimeoutMs: number,
 ): ScreenshotQueue {
     let inFlight = 0;
     const waiting: QueuedTask[] = [];
@@ -90,9 +99,10 @@ function createScreenshotQueue(
                 return;
             }
 
+            task.cleanup();
             inFlight += 1;
-            void task
-                .run()
+            void Promise.resolve()
+                .then(task.run)
                 .then(task.resolve, task.reject)
                 .finally(() => {
                     inFlight -= 1;
@@ -102,17 +112,41 @@ function createScreenshotQueue(
     }
 
     return {
-        schedule<T>(run: () => Promise<T>): Promise<T> | undefined {
+        schedule<T>(
+            run: () => Promise<T>,
+            signal: AbortSignal,
+        ): Promise<T> | undefined {
+            if (signal.aborted) {
+                return Promise.reject(new Error('Capture cancelled.'));
+            }
             if (inFlight >= maxInFlight && waiting.length >= maxQueue) {
                 return undefined;
             }
 
             const promise = new Promise<T>((resolve, reject) => {
-                waiting.push({
+                const remove = (message: string) => {
+                    const index = waiting.indexOf(task);
+                    if (index === -1) return;
+                    waiting.splice(index, 1);
+                    task.cleanup();
+                    reject(new Error(message));
+                };
+                const onAbort = () => remove('Capture cancelled.');
+                const timer = setTimeout(
+                    () => remove('Screenshot queue wait timed out.'),
+                    queueTimeoutMs,
+                );
+                const task: QueuedTask = {
                     run: run as () => Promise<unknown>,
                     resolve: resolve as (value: unknown) => void,
                     reject,
-                });
+                    cleanup: () => {
+                        clearTimeout(timer);
+                        signal.removeEventListener('abort', onAbort);
+                    },
+                };
+                signal.addEventListener('abort', onAbort, { once: true });
+                waiting.push(task);
             });
             drain();
             return promise;
@@ -136,6 +170,10 @@ export function createApp(options: CreateAppOptions = {}): Hono {
     const queue = createScreenshotQueue(
         positiveInteger(options.maxInFlight ?? process.env.MAX_INFLIGHT, 1),
         positiveInteger(options.maxQueue ?? process.env.MAX_QUEUE, 50),
+        positiveInteger(
+            options.queueTimeoutMs ?? process.env.QUEUE_TIMEOUT_MS,
+            120_000,
+        ),
     );
     const app = new Hono();
 
@@ -172,6 +210,7 @@ export function createApp(options: CreateAppOptions = {}): Hono {
         const url = new URL(parsed.data.url).toString();
         const screenshotOptions: ScreenshotOptions = {
             url,
+            signal: context.req.raw.signal,
             includeMobile: parsed.data.includeMobile ?? false,
             ...(parsed.data.waitForMs === undefined
                 ? {}
@@ -180,7 +219,10 @@ export function createApp(options: CreateAppOptions = {}): Hono {
                 ? {}
                 : { resizeWaitMs: parsed.data.resizeWaitMs }),
         };
-        const scheduled = queue.schedule(() => capture(screenshotOptions));
+        const scheduled = queue.schedule(
+            () => capture(screenshotOptions),
+            context.req.raw.signal,
+        );
 
         if (!scheduled) {
             return context.json(
