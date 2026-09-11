@@ -1,6 +1,7 @@
 import { type Browser, chromium, type ViewportSize } from 'playwright';
 
 import { prepareCleanScreenshot } from './clean-screenshot.js';
+import { validateRenderedPage } from './render-validation.js';
 
 const DESKTOP_VIEWPORT = { width: 1920, height: 1080 };
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
@@ -94,7 +95,7 @@ async function captureViewport(
 
     try {
         const page = await context.newPage();
-        await page.goto(options.url, {
+        const navigationResponse = await page.goto(options.url, {
             waitUntil: 'domcontentloaded',
             timeout: options.timeoutMs,
         });
@@ -110,6 +111,7 @@ async function captureViewport(
                 console.warn(`Clean screenshot phase failed: ${phase}`, error);
             },
         });
+        await validateRenderedPage({ page, navigationResponse });
 
         const buffer = await page.screenshot({
             type: 'png',

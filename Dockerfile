@@ -7,7 +7,7 @@ USER root
 RUN useradd -m -s /bin/bash screenshot
 WORKDIR /home/screenshot
 ENV PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/google-chrome
-RUN npm install --global pnpm@11.18.0
+RUN corepack install --global pnpm@11.18.0
 USER screenshot
 
 COPY --chown=screenshot package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -25,7 +25,7 @@ WORKDIR /home/screenshot
 ENV PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV NODE_ENV=production
 ENV PORT=3000
-RUN npm install --global pnpm@11.18.0
+RUN corepack install --global pnpm@11.18.0
 USER screenshot
 
 COPY --chown=screenshot package.json pnpm-lock.yaml pnpm-workspace.yaml ./

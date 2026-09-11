@@ -79,6 +79,23 @@ async function main(): Promise<void> {
     assert.ok(typeof desktop.base64 === 'string' && desktop.base64.length > 0);
     assert.ok(typeof mobile.base64 === 'string' && mobile.base64.length > 0);
 
+    for (const pathname of [
+        '/cloudflare',
+        '/challenge',
+        '/loading',
+        '/blank',
+        '/below-fold',
+    ]) {
+        const invalidCapture = await capture({
+            url: new URL(pathname, fixtureUrl).toString(),
+            waitForMs: 0,
+            resizeWaitMs: 0,
+        });
+        assert.equal(invalidCapture.status, 500);
+        assert.equal(invalidCapture.body.ok, false);
+        assert.match(String(invalidCapture.body.error), /Screenshot target/);
+    }
+
     console.log('E2E contract tests passed.');
 }
 
