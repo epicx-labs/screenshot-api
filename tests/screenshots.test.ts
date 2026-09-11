@@ -350,6 +350,28 @@ describe('captureScreenshots', () => {
         expect(playwrightState.contexts[0]?.screenshot).not.toHaveBeenCalled();
     });
 
+    test('accepts a valid page that contains an embedded CAPTCHA widget', async () => {
+        playwrightState.renderedState = {
+            bodyText:
+                'Contact our support team for product guidance and account help.',
+            hasChallengeElement: true,
+            heading: 'Contact support',
+            title: 'Support',
+            visibleMediaCount: 1,
+            visibleTextLength: 63,
+        };
+        const { captureScreenshots } = await import(
+            '../src/modules/screenshots/index.js'
+        );
+
+        await expect(
+            captureScreenshots({ url: 'https://example.com/contact' }),
+        ).resolves.toEqual({
+            desktop: { base64: Buffer.from('desktop').toString('base64') },
+        });
+        expect(playwrightState.contexts[0]?.screenshot).toHaveBeenCalledOnce();
+    });
+
     test('a stalled capture times out and releases the HTTP queue', async () => {
         const { captureScreenshots } = await import(
             '../src/modules/screenshots/index.js'

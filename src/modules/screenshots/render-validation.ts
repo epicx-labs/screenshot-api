@@ -2,6 +2,8 @@ import type { Page, Response as PlaywrightResponse } from 'playwright';
 
 const INVALID_PAGE_TEXT =
     /^(?:(?:404(?: error)?|access denied|attention required|captcha|checking your browser|just a moment|not found|page not found|please wait|verify (?:that )?you are human)(?:\s*[-|:].*)?|loading(?:\.{0,3})?)$/i;
+const CHALLENGE_PAGE_TEXT =
+    /\b(?:attention required|checking your browser|just a moment|security check|verify (?:that )?you are human)\b/i;
 
 const RENDERED_PAGE_INSPECTION_SCRIPT = `(() => {
     const marker = '__SCREENSHOT_VALIDATION__';
@@ -116,6 +118,17 @@ function isInvalidPageText(value: string): boolean {
     return INVALID_PAGE_TEXT.test(value.replace(/[.!…]+$/g, '').trim());
 }
 
+/** Returns whether page copy identifies an active browser challenge. */
+function hasChallengePageCopy(state: RenderedPageState): boolean {
+    return (
+        [state.title, state.heading].some((value) =>
+            CHALLENGE_PAGE_TEXT.test(value),
+        ) ||
+        (state.bodyText.length <= 600 &&
+            CHALLENGE_PAGE_TEXT.test(state.bodyText))
+    );
+}
+
 /** Rejects navigation errors, challenge pages, loading shells, and blank pages. */
 export async function validateRenderedPage(options: {
     /** Page after its cleanup and lazy-media preparation steps. */
@@ -141,10 +154,12 @@ export async function validateRenderedPage(options: {
     const hasInvalidCopy = [state.title, state.heading, state.bodyText].some(
         isInvalidPageText,
     );
+    const isChallengePage =
+        state.hasChallengeElement && hasChallengePageCopy(state);
     const isBlank =
         state.visibleTextLength === 0 && state.visibleMediaCount === 0;
 
-    if (state.hasChallengeElement || hasInvalidCopy || isBlank) {
+    if (isChallengePage || hasInvalidCopy || isBlank) {
         throw new InvalidRenderedPageError(
             'Screenshot target is not a valid rendered page',
         );
