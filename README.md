@@ -107,6 +107,17 @@ Validation failure:
 Capture failures return HTTP `500`. When the configured capture queue is full,
 the API returns HTTP `429` with a `Retry-After` header.
 
+Each capture has a two-minute deadline covering browser startup, both viewports,
+page cleanup, screenshot generation, and browser closure. A failed, cancelled,
+or timed-out capture terminates its dedicated browser process before releasing
+capacity. Each request starts a browser, adding startup overhead in exchange for
+isolated recovery when a page stalls. Capture failures log the hostname, viewport,
+stage, and elapsed time.
+
+Waiting requests expire after `QUEUE_TIMEOUT_MS` and are removed when the client
+disconnects. Expired requests use the existing HTTP `500` error envelope. The
+`/health` route reports HTTP server liveness, not browser or queue readiness.
+
 ### Health routes
 
 - `GET /health` returns `{ "ok": true }`.
@@ -175,6 +186,7 @@ Docker Compose exposes the API at `http://localhost:4000`.
 | `PORT` | `3000` | Server port |
 | `MAX_INFLIGHT` | `1` | Captures allowed to run simultaneously |
 | `MAX_QUEUE` | `50` | Captures allowed to wait |
+| `QUEUE_TIMEOUT_MS` | `120000` | Maximum time waiting for capture capacity |
 | `RATE_LIMIT_RETRY_AFTER_SECS` | `10` | `Retry-After` value for HTTP `429` |
 | `PLAYWRIGHT_EXECUTABLE_PATH` | Playwright default | Optional Chrome executable path |
 
