@@ -17,6 +17,8 @@ Source: [GitHub repository](https://github.com/epicx-labs/screenshot-api)
 - Clean webpage screenshots without common consent banners, popups, or
   animations.
 - Independent desktop and mobile browser contexts for responsive screenshots.
+- Browser-aware rejection of HTTP errors, challenge pages, loading shells, and
+  blank viewports.
 - Base64-encoded PNG responses for easy storage or embedding.
 - Docker image with headless Chromium included.
 - Bounded capture queue with HTTP `429` backpressure.
@@ -123,7 +125,7 @@ disconnects. Expired requests use the existing HTTP `500` error envelope. The
 
 ## What “clean” means
 
-Before each viewport is captured, the API:
+Before each viewport is returned, the API:
 
 1. Dismisses or hides common consent banners, modals, popups, and floating
    widgets.
@@ -132,6 +134,8 @@ Before each viewport is captured, the API:
 4. Disables animations, transitions, smooth scrolling, and text carets.
 5. Pauses videos.
 6. Runs blocker cleanup once more for late popups.
+7. Rejects failed navigation, known error/challenge/loading states, and
+   viewports without visible text or media.
 
 Cleanup is best-effort. A site-specific cleanup failure does not discard an
 otherwise valid screenshot.

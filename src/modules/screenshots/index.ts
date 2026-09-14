@@ -6,6 +6,7 @@ import {
 } from 'playwright';
 
 import { prepareCleanScreenshot } from './clean-screenshot.js';
+import { validateRenderedPage } from './render-validation.js';
 
 const DESKTOP_VIEWPORT = { width: 1920, height: 1080 };
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
@@ -79,7 +80,7 @@ async function captureViewport(
         options.setStage('create page');
         const page = await context.newPage();
         options.setStage('navigate');
-        await page.goto(options.url, {
+        const navigationResponse = await page.goto(options.url, {
             waitUntil: 'domcontentloaded',
             timeout: options.timeoutMs,
         });
@@ -97,6 +98,9 @@ async function captureViewport(
                 console.warn(`Clean screenshot phase failed: ${phase}`, error);
             },
         });
+
+        options.setStage('validate render');
+        await validateRenderedPage({ page, navigationResponse });
 
         options.setStage('screenshot');
         const buffer = await page.screenshot({

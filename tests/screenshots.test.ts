@@ -11,6 +11,15 @@ const playwrightState = vi.hoisted(() => ({
     }>,
     screenshotBuffers: [Buffer.from('desktop'), Buffer.from('mobile')],
     screenshotError: undefined as Error | undefined,
+    navigationStatus: 200,
+    renderedState: {
+        bodyText: 'Example product documentation',
+        hasChallengeElement: false,
+        heading: 'Documentation',
+        title: 'Example',
+        visibleMediaCount: 0,
+        visibleTextLength: 29,
+    },
     stallScreenshot: false,
     stalledOperation: '',
     launchGate: undefined as Promise<void> | undefined,
@@ -41,18 +50,24 @@ vi.mock('playwright', () => ({
                         viewport: { width: number; height: number };
                     }) => {
                         const screenshotIndex = playwrightState.contexts.length;
-                        const goto = vi.fn().mockResolvedValue(undefined);
+                        const goto = vi.fn().mockImplementation(async () => ({
+                            status: () => playwrightState.navigationStatus,
+                        }));
                         const waitForTimeout = vi
                             .fn()
                             .mockResolvedValue(undefined);
                         const evaluate = vi
                             .fn()
-                            .mockImplementation(async () => {
+                            .mockImplementation(async (script: unknown) => {
                                 if (
                                     playwrightState.stalledOperation ===
                                     'cleanup'
                                 )
                                     return new Promise(() => {});
+                                return typeof script === 'string' &&
+                                    script.includes('__SCREENSHOT_VALIDATION__')
+                                    ? playwrightState.renderedState
+                                    : undefined;
                             });
                         const screenshot = vi
                             .fn()
@@ -79,6 +94,7 @@ vi.mock('playwright', () => ({
                         const context = {
                             viewport,
                             goto,
+                            url: () => 'https://example.com/',
                             waitForTimeout,
                             evaluate,
                             screenshot,
@@ -111,6 +127,15 @@ describe('captureScreenshots', () => {
             Buffer.from('mobile'),
         ];
         playwrightState.screenshotError = undefined;
+        playwrightState.navigationStatus = 200;
+        playwrightState.renderedState = {
+            bodyText: 'Example product documentation',
+            hasChallengeElement: false,
+            heading: 'Documentation',
+            title: 'Example',
+            visibleMediaCount: 0,
+            visibleTextLength: 29,
+        };
         playwrightState.stallScreenshot = false;
         playwrightState.stalledOperation = '';
         playwrightState.launchGate = undefined;
@@ -265,6 +290,86 @@ describe('captureScreenshots', () => {
             captureScreenshots({ url: 'https://example.com' }),
         ).rejects.toThrow('Screenshot failed.');
         expect(playwrightState.contexts[0]?.close).toHaveBeenCalledOnce();
+    });
+
+    test('rejects an HTTP error page before capturing pixels', async () => {
+        playwrightState.navigationStatus = 404;
+        const { captureScreenshots } = await import(
+            '../src/modules/screenshots/index.js'
+        );
+
+        await expect(
+            captureScreenshots({ url: 'https://example.com/missing' }),
+        ).rejects.toThrow('HTTP 404');
+        expect(playwrightState.contexts[0]?.screenshot).not.toHaveBeenCalled();
+    });
+
+    test.each([
+        {
+            name: 'CAPTCHA challenge',
+            state: {
+                bodyText: 'Verify you are human',
+                hasChallengeElement: true,
+                heading: '',
+                title: 'Attention required',
+                visibleMediaCount: 0,
+                visibleTextLength: 20,
+            },
+        },
+        {
+            name: 'loading shell',
+            state: {
+                bodyText: 'Loading...',
+                hasChallengeElement: false,
+                heading: '',
+                title: '',
+                visibleMediaCount: 0,
+                visibleTextLength: 10,
+            },
+        },
+        {
+            name: 'blank viewport',
+            state: {
+                bodyText: '',
+                hasChallengeElement: false,
+                heading: '',
+                title: '',
+                visibleMediaCount: 0,
+                visibleTextLength: 0,
+            },
+        },
+    ])('rejects a $name before capturing pixels', async ({ state }) => {
+        playwrightState.renderedState = state;
+        const { captureScreenshots } = await import(
+            '../src/modules/screenshots/index.js'
+        );
+
+        await expect(
+            captureScreenshots({ url: 'https://example.com' }),
+        ).rejects.toThrow('not a valid rendered page');
+        expect(playwrightState.contexts[0]?.screenshot).not.toHaveBeenCalled();
+    });
+
+    test('accepts a valid page that contains an embedded CAPTCHA widget', async () => {
+        playwrightState.renderedState = {
+            bodyText:
+                'Contact our support team for product guidance and account help.',
+            hasChallengeElement: true,
+            heading: 'Contact support',
+            title: 'Support',
+            visibleMediaCount: 1,
+            visibleTextLength: 63,
+        };
+        const { captureScreenshots } = await import(
+            '../src/modules/screenshots/index.js'
+        );
+
+        await expect(
+            captureScreenshots({ url: 'https://example.com/contact' }),
+        ).resolves.toEqual({
+            desktop: { base64: Buffer.from('desktop').toString('base64') },
+        });
+        expect(playwrightState.contexts[0]?.screenshot).toHaveBeenCalledOnce();
     });
 
     test('a stalled capture times out and releases the HTTP queue', async () => {

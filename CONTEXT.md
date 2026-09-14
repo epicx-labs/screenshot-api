@@ -13,10 +13,16 @@ page content.
 A viewport and near-fold scroll pass that encourages lazy images, videos, and
 embeds to render before capture.
 
+**Valid Render**:
+A page whose main navigation succeeded and whose cleaned viewport contains
+meaningful visible text or media without a known error, loading, or challenge
+state.
+
 ## Rules
 
 - `POST /screenshots` preserves its existing public request and response shape.
 - Desktop capture is always returned; mobile capture is opt-in.
 - Every viewport runs the clean screenshot pipeline independently.
+- A successful capture contains only viewports that passed valid-render checks.
 - Cleanup is best-effort and must not fail an otherwise valid capture.
 - The service exposes no crawler or audit endpoints.
